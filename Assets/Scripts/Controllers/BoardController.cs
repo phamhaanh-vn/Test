@@ -15,7 +15,8 @@ public class BoardController : MonoBehaviour
 
     private GameManager m_gameManager;
 
-    private bool m_isDragging;
+    public static Cell hotCell;
+    public bool m_isDragging;
 
     private Camera m_cam;
 
@@ -41,7 +42,7 @@ public class BoardController : MonoBehaviour
 
         m_cam = Camera.main;
 
-        m_board = new Board(this.transform, gameSettings);
+        m_board = new Board(this.transform, gameSettings, this);
 
         Fill();
     }
@@ -85,92 +86,97 @@ public class BoardController : MonoBehaviour
             }
         }
 
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0) && !m_isDragging)
         {
             var hit = Physics2D.Raycast(m_cam.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
             if (hit.collider != null)
             {
                 m_isDragging = true;
                 m_hitCollider = hit.collider;
-            }
-        }
-
-        if (Input.GetMouseButtonUp(0))
-        {
-            ResetRayCast();
-        }
-
-        if (Input.GetMouseButton(0) && m_isDragging)
-        {
-            var hit = Physics2D.Raycast(m_cam.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
-            if (hit.collider != null)
-            {
-                if (m_hitCollider != null && m_hitCollider != hit.collider)
+                Cell clickedCell = hit.collider.GetComponent<Cell>();
+                if (clickedCell != null && clickedCell.Isboardcell)
                 {
-                    StopHints();
-
-                    Cell c1 = m_hitCollider.GetComponent<Cell>();
-                    Cell c2 = hit.collider.GetComponent<Cell>();
-                    if (AreItemsNeighbor(c1, c2))
+                    m_board.SwapWithHotCell(clickedCell, () =>
                     {
-                        IsBusy = true;
-                        SetSortingLayer(c1, c2);
-                        m_board.Swap(c1, c2, () =>
-                        {
-                            FindMatchesAndCollapse(c1, c2);
-                        });
-
-                        ResetRayCast();
-                    }
+                        m_isDragging= false;
+                        FindMatchesAndCollapse(hotCell);
+                    });
+                }
+                else
+                {
+                    m_isDragging = false; // reset nếu không phải Cell
                 }
             }
-            else
-            {
-                ResetRayCast();
-            }
+
+            //if (Input.GetMouseButtonUp(0))
+            //{
+            //    ResetRayCast();
+            //}
+
+            //if (Input.GetMouseButton(0) && m_isDragging)
+            //{
+            //    var hit = Physics2D.Raycast(m_cam.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
+            //    if (hit.collider != null)
+            //    {
+            //        if (m_hitCollider != null && m_hitCollider != hit.collider)
+            //        {
+            //            StopHints();
+
+            //            Cell c1 = m_hitCollider.GetComponent<Cell>();
+            //            Cell c2 = hit.collider.GetComponent<Cell>();
+            //            if (AreItemsNeighbor(c1, c2))
+            //            {
+            //                IsBusy = true;
+            //                SetSortingLayer(c1, c2);
+            //                m_board.Swap(c1, c2, () =>
+            //                {
+            //                    FindMatchesAndCollapse(c1, c2);
+            //                });
+
+            //                ResetRayCast();
+            //            }
+            //        }
+            //    }
+            //    else
+            //    {
+            //        ResetRayCast();
+            //    }
+            //}
         }
     }
 
-    private void ResetRayCast()
-    {
-        m_isDragging = false;
-        m_hitCollider = null;
-    }
+    //private void ResetRayCast()
+    //{
+    //    m_isDragging = false;
+    //    m_hitCollider = null;
+    //}
 
-    private void FindMatchesAndCollapse(Cell cell1, Cell cell2)
+    private void FindMatchesAndCollapse(Cell cell1)
     {
         if (cell1.Item is BonusItem)
         {
             cell1.ExplodeItem();
             StartCoroutine(ShiftDownItemsCoroutine());
         }
-        else if (cell2.Item is BonusItem)
-        {
-            cell2.ExplodeItem();
-            StartCoroutine(ShiftDownItemsCoroutine());
-        }
         else
         {
             List<Cell> cells1 = GetMatches(cell1);
-            List<Cell> cells2 = GetMatches(cell2);
 
             List<Cell> matches = new List<Cell>();
             matches.AddRange(cells1);
-            matches.AddRange(cells2);
+
             matches = matches.Distinct().ToList();
 
             if (matches.Count < m_gameSettings.MatchesMin)
             {
-                m_board.Swap(cell1, cell2, () =>
-                {
+                
                     IsBusy = false;
-                });
             }
             else
             {
                 OnMoveEvent();
 
-                CollapseMatches(matches, cell2);
+                CollapseMatches(matches, cell1);
             }
         }
     }
@@ -229,7 +235,7 @@ public class BoardController : MonoBehaviour
             m_board.ConvertNormalToBonus(matches, cellEnd);
         }
 
-        StartCoroutine(ShiftDownItemsCoroutine());
+        //StartCoroutine(ShiftDownItemsCoroutine());
     }
 
     private IEnumerator ShiftDownItemsCoroutine()
@@ -302,5 +308,10 @@ public class BoardController : MonoBehaviour
         }
 
         m_potentialMatch.Clear();
+    }
+    public IEnumerator DelayGameOver()
+    {
+        yield return new WaitForSeconds(0.5f);
+        m_gameManager.SetState(GameManager.eStateGame.GAME_OVER);
     }
 }

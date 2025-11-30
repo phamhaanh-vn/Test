@@ -14,8 +14,14 @@ public class UIPanelMain : MonoBehaviour, IMenu
 
     private void Awake()
     {
-        btnMoves.onClick.AddListener(OnClickMoves);
-        btnTimer.onClick.AddListener(OnClickTimer);
+        if (btnMoves != null)
+        {
+            btnMoves.onClick.AddListener(OnClickMoves);
+        }
+        if (btnTimer != null)
+        {
+            btnTimer.onClick.AddListener(OnClickTimer);
+        }
     }
 
     private void OnDestroy()
@@ -31,12 +37,18 @@ public class UIPanelMain : MonoBehaviour, IMenu
 
     private void OnClickTimer()
     {
-        m_mngr.LoadLevelTimer();
+        if (m_mngr != null)
+        {
+            m_mngr.LoadLevelTimer();
+        }
     }
 
     private void OnClickMoves()
     {
-        m_mngr.LoadLevelMoves();
+        if (m_mngr != null)
+        {
+            m_mngr.LoadLevelMoves();
+        }
     }
 
     public void Show()

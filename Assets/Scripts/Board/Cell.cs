@@ -6,13 +6,16 @@ public class Cell : MonoBehaviour
     public int BoardX { get; private set; }
 
     public int BoardY { get; private set; }
-
+    public bool Isboardcell;
+    public int BX;
+    public int BY;
     public Item Item { get; private set; }
 
     public Cell NeighbourUp { get; set; }
 
     public Cell NeighbourRight { get; set; }
-
+    public Cell Nr;
+    public Cell Nl;
     public Cell NeighbourBottom { get; set; }
 
     public Cell NeighbourLeft { get; set; }
@@ -25,7 +28,11 @@ public class Cell : MonoBehaviour
         this.BoardX = cellX;
         this.BoardY = cellY;
     }
-
+    public void Sp(int cellX, int cellY)
+    {
+        this.BX = cellX;
+        this.BY = cellY;
+    }
     public bool IsNeighbour(Cell other)
     {
         return BoardX == other.BoardX && Mathf.Abs(BoardY - other.BoardY) == 1 ||
@@ -41,7 +48,10 @@ public class Cell : MonoBehaviour
     public void Assign(Item item)
     {
         Item = item;
-        Item.SetCell(this);
+        if (Item != null)
+        {
+            Item.SetCell(this);
+        }
     }
 
     public void ApplyItemPosition(bool withAppearAnimation)

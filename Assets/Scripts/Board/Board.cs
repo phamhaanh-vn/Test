@@ -4,6 +4,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using static UnityEditor.Progress;
+using static UnityEngine.UI.Image;
 
 public class Board
 {
@@ -14,29 +16,31 @@ public class Board
         VERTICAL,
         ALL
     }
-
+    private BoardController gameManager;
+    public int index = 0;
     private int boardSizeX;
 
     private int boardSizeY;
 
+    public Cell[,] h_cell;
     private Cell[,] m_cells;
-
     private Transform m_root;
 
     private int m_matchMin;
 
-    public Board(Transform transform, GameSettings gameSettings)
+    public Board(Transform transform, GameSettings gameSettings,BoardController controller)
     {
         m_root = transform;
 
         m_matchMin = gameSettings.MatchesMin;
-
+        this.gameManager = controller;
         this.boardSizeX = gameSettings.BoardSizeX;
         this.boardSizeY = gameSettings.BoardSizeY;
 
         m_cells = new Cell[boardSizeX, boardSizeY];
-
+        h_cell = new Cell[5,1];
         CreateBoard();
+        CreatePlay();
     }
 
     private void CreateBoard()
@@ -55,8 +59,10 @@ public class Board
                 cell.Setup(x, y);
 
                 m_cells[x, y] = cell;
+                cell.Isboardcell = true;
             }
         }
+        Debug.Log($"Board size: X={boardSizeX}, Y={boardSizeY}");
 
         //set neighbours
         for (int x = 0; x < boardSizeX; x++)
@@ -69,10 +75,75 @@ public class Board
                 if (x > 0) m_cells[x, y].NeighbourLeft = m_cells[x - 1, y];
             }
         }
+    }
+    public void CreatePlay()
+    {
+        Vector3 origin = new Vector3(-boardSizeX * 0.5f + 0.5f, -boardSizeY * 0.5f + 0.5f, 0f);
+        Vector3 neworigin = origin+ new Vector3(-1, -2, 0f);
+        GameObject prefabBG = Resources.Load<GameObject>(Constants.PREFAB_CELL_BACKGROUND);
+        for (int x = 0; x < 5; x++)
+        {
+            for (int y = 0; y < 1; y++)
+            {
+                GameObject go = GameObject.Instantiate(prefabBG);
+                go.transform.position = neworigin + new Vector3(x, y, 0f);
+                go.transform.SetParent(m_root);
+
+                Cell cell = go.GetComponent<Cell>();
+                cell.Sp(x, y);
+
+                h_cell[x, y] = cell;
+                cell.Isboardcell = false;
+            }
+        }
+        // Thiết lập các ô lân cận trong h_cell
+        for (int x = 0; x < 5; x++) // Hàng trong h_cell chỉ có 5 ô
+        {
+            
+            if (x + 1 < 5) // Nếu không phải ô cuối cùng
+            {
+                h_cell[x,0].Nr = h_cell[x + 1, 0];
+            }
+
+            // Thiết lập NeighbourLeft (nếu có ô kế bên)
+            if (x > 0) // Nếu không phải ô đầu tiên
+            {
+                h_cell[x,0].Nl = h_cell[x - 1, 0];
+            }
+        }
 
     }
+    public void SwapWithHotCell(Cell clickedCell, Action callback)
+    {
+        for (int index = 0; index < 5; index++)
+        {
+            if (h_cell[index, 0].Item == null)
+            {
+                if (clickedCell.Item != null)
+                {
+                    BoardController.hotCell = h_cell[index, 0];
+                    Swap(clickedCell, BoardController.hotCell,() =>
+                    {
+                        List<Cell> horizontalMatches = GetHorizontalMatches(BoardController.hotCell);
+                        if (index == 4 && horizontalMatches.Count < 3)
+                        {
+                            Debug.Log("Game Over triggered.");
+                            gameManager.StartCoroutine(gameManager.DelayGameOver());
+                        }
+                        callback?.Invoke();
+                    }
+                    );
+                    return;
+                }
+                else
+                {
+                    callback?.Invoke();
+                }
+            }
+        }
 
-    internal void Fill()
+    }
+internal void Fill()
     {
         for (int x = 0; x < boardSizeX; x++)
         {
@@ -173,13 +244,19 @@ public class Board
     {
         Item item = cell1.Item;
         cell1.Free();
-        Item item2 = cell2.Item;
-        cell1.Assign(item2);
         cell2.Free();
         cell2.Assign(item);
+        if (item != null)
+        {
+            item.View.DOMove(cell2.transform.position, 0.3f).OnComplete(() =>
+            {
+                callback?.Invoke(); // reset m_isDragging tại đây
+            });
+        }
+       
 
-        item.View.DOMove(cell2.transform.position, 0.3f);
-        item2.View.DOMove(cell1.transform.position, 0.3f).OnComplete(() => { if (callback != null) callback(); });
+        //if (item2 != null)
+        //item2.View.DOMove(cell1.transform.position, 0.3f);
     }
 
     public List<Cell> GetHorizontalMatches(Cell cell)
@@ -191,9 +268,8 @@ public class Board
         Cell newcell = cell;
         while (true)
         {
-            Cell neib = newcell.NeighbourRight;
+            Cell neib = newcell.Nr;
             if (neib == null) break;
-
             if (neib.IsSameType(cell))
             {
                 list.Add(neib);
@@ -205,9 +281,8 @@ public class Board
         newcell = cell;
         while (true)
         {
-            Cell neib = newcell.NeighbourLeft;
+            Cell neib = newcell.Nl;
             if (neib == null) break;
-
             if (neib.IsSameType(cell))
             {
                 list.Add(neib);
